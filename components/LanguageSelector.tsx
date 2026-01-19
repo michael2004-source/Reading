@@ -12,16 +12,13 @@ const languages = [
     "French",
     "German",
     "Italian",
-    "Portuguese",
-    "Dutch",
+    "Portuguese (Brazil)",
     "Russian",
-    "Chinese (Simplified)",
     "Japanese",
     "Korean",
     "Arabic",
     "Hindi",
     "Turkish",
-    "Vietnamese"
 ];
 
 const LanguageSelector: React.FC<LanguageSelectorProps> = ({ selectedLanguage, onSelectLanguage }) => {

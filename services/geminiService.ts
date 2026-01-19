@@ -39,41 +39,65 @@ export async function decodeAudioData(
   return buffer;
 }
 
+const languageCodeMap: { [key: string]: string } = {
+    "English": "en",
+    "Spanish": "es",
+    "French": "fr",
+    "German": "de",
+    "Italian": "it",
+    "Portuguese (Brazil)": "pt-BR",
+    "Russian": "ru",
+    "Japanese": "ja",
+    "Korean": "ko",
+    "Arabic": "ar",
+    "Hindi": "hi",
+    "Turkish": "tr",
+};
 
 export async function getDefinition(word: string, language: string): Promise<string> {
-    const prompt = `Provide a dictionary-style definition for the word "${word}" in ${language}. Structure your response using markdown.
-- If available, include the phonetic transcription in italics on the first line.
-- Use a level 3 heading (###) for each part of speech (e.g., ### Noun, ### Verb).
-- Under each part of speech, use a numbered list for distinct meanings.
-- For each meaning, provide a concise definition followed by an example sentence in italics on a new line, indented.
-
-Example response for 'ephemeral':
-
-*/əˈfem(ə)rəl/*
-
-### Adjective
-1. Lasting for a very short time.
-   *Example: "The beauty of the cherry blossoms is ephemeral."*
-`;
+    const langCode = languageCodeMap[language] || 'en';
+    const url = `https://api.dictionaryapi.dev/api/v2/entries/${langCode}/${word}`;
 
     try {
-        const response = await ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
-            contents: prompt,
-            config: {
-                systemInstruction: `You are a helpful dictionary assistant. Your definitions should be in ${language}, clear, concise, and follow the requested markdown format precisely. Do not add any conversational filler.`,
-                temperature: 0.1, // Low temperature for factual, consistent output
-            },
+        const response = await fetch(url);
+        if (!response.ok) {
+            if (response.status === 404) {
+                return `Sorry, no definition could be found for "${word}" in ${language}.`;
+            }
+            throw new Error(`Network response was not ok: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        if (!data || data.length === 0) {
+            return `Sorry, no definition could be found for "${word}" in ${language}.`;
+        }
+        
+        const entry = data[0];
+        let markdown = '';
+
+        // Add phonetic transcription
+        const phonetic = entry.phonetics?.find((p: any) => p.text)?.text;
+        if (phonetic) {
+            markdown += `*${phonetic}*\n\n`;
+        }
+
+        // Add meanings
+        entry.meanings?.forEach((meaning: any) => {
+            markdown += `### ${meaning.partOfSpeech}\n`;
+            meaning.definitions?.forEach((def: any, index: number) => {
+                markdown += `${index + 1}. ${def.definition}\n`;
+                if (def.example) {
+                    markdown += `   *Example: "${def.example}"*\n`;
+                }
+            });
+            markdown += '\n';
         });
 
-        const text = response.text;
-        if (!text) {
-            throw new Error("No definition was returned by the model.");
-        }
-        return text;
+        return markdown.trim() || "Could not parse the definition.";
+
     } catch (error) {
-        console.error("Error fetching definition from Gemini API:", error);
-        return "Sorry, I couldn't fetch a definition for that word. The API might be unavailable or the request could not be processed. Please try again later.";
+        console.error("Error fetching definition from Dictionary API:", error);
+        return "Sorry, there was an issue connecting to the dictionary service. Please check your network connection and try again.";
     }
 }
 
@@ -95,7 +119,6 @@ export async function getAudioForWord(word: string): Promise<AudioBuffer | null>
         const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
         if (base64Audio) {
             // The API returns audio at 24000Hz sample rate.
-            // FIX: Cast window to any to access webkitAudioContext without TypeScript errors.
             const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
             const decodedBytes = decode(base64Audio);
             const audioBuffer = await decodeAudioData(decodedBytes, audioContext, 24000, 1);
