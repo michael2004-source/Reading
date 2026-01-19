@@ -1,0 +1,5 @@
+{
+  "name": "Interactive Reader",
+  "description": "Upload a PDF or ePub document and tap on any word to get its definition. An interactive way to expand your vocabulary while you read.",
+  "requestFramePermissions": []
+}
